@@ -1,21 +1,35 @@
+import json, random
 from django.shortcuts import render
 from django.http import HttpResponse
 # Create your views here.
+#import django.middleware.csrf.CsrfViewMiddleware
+
+from upload.models import FileInfo
+from upload.uploader import FolderManager
 
 def index(request):
     print("OK")
     return render(request, 'upload.html')
 
 def data(request):
-    print("OK")
+    if request.method != "POST":
+        err_info = "Only support POST method now"
+        print(err_info)
+        return HttpResponse(err_info)
+
     uploadfile = request.FILES['file']
-    print(type(uploadfile))
-    print(dir(uploadfile))
-    chunk_size = 10 * 2 ** 20
-    written_size = 0
-    with open("./" + uploadfile.name, "wb") as file:
-        for chunk in uploadfile.chunks(chunk_size):
-            file.write(chunk)
-            written_size += len(chunk)
-            print("Percentage : ", str(written_size / uploadfile.size * 100 ) + "%")
-    return HttpResponse("OK")
+    if 'chunk' not in request.POST:
+        save_file_path = FolderManager.get_save_path(uploadfile.name)
+        with open(save_file_path, 'wb') as save_file:
+            save_file.write(uploadfile.read())
+    else:
+        chunk_count, chunk_index = int(request.POST['chunks']), int(request.POST['chunk'])
+        save_file_path = FolderManager.save_tmp_file(uploadfile, chunk_count, chunk_index)
+        if save_file_path is None:
+            return HttpResponse("Upload not complete")
+
+    '''
+    fileInfo = FileInfo(path = save_file_path)
+    fileInfo.save()
+    '''
+    return HttpResponse(json.dumps({'status': 'OK', "slide_id": random.randint(1, 200)}), content_type='application/json')
